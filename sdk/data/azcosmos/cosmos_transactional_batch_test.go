@@ -43,7 +43,14 @@ func TestTransactionalBatchReadItem(t *testing.T) {
 	batch := &TransactionalBatch{}
 	batch.partitionKey = NewPartitionKeyString("foo")
 	itemId := "bar"
-	batch.ReadItem(itemId, nil)
+
+	options := &TransactionalBatchItemOptions{}
+	etag := azcore.ETag("someEtag")
+	otherEtag := azcore.ETag("otherEtag")
+	options.IfNoneMatchETag = &etag
+	options.IfMatchETag = &otherEtag
+
+	batch.ReadItem(itemId, options)
 
 	if len(batch.operations) != 1 {
 		t.Errorf("Expected 1 operation, but got %v", len(batch.operations))
@@ -62,6 +69,18 @@ func TestTransactionalBatchReadItem(t *testing.T) {
 	if asRead.id != itemId {
 		t.Errorf("Expected id %v, but got %v", itemId, asRead.id)
 	}
+
+	if asRead.ifNoneMatch != options.IfNoneMatchETag {
+		t.Errorf("Expected ifNoneMatch %v, but got %v", etag, asRead.ifNoneMatch)
+	}
+
+	b, err := json.Marshal(asRead)
+	if err != nil {
+		t.Errorf("Expected no error marshalling, but got %v", err)
+	}
+
+	a := string(b)
+	t.Log(a)
 }
 
 func TestTransactionalBatchUpsertItem(t *testing.T) {

@@ -65,10 +65,16 @@ func (b *TransactionalBatch) UpsertItem(item []byte, o *TransactionalBatchItemOp
 
 // ReadItem adds a read operation to the batch.
 func (b *TransactionalBatch) ReadItem(itemID string, o *TransactionalBatchItemOptions) {
+	if o == nil {
+		o = &TransactionalBatchItemOptions{}
+	}
+
 	b.operations = append(b.operations,
 		batchOperationRead{
 			operationType: "Read",
-			id:            itemID})
+			id:            itemID,
+			ifMatch:       o.IfMatchETag,
+			ifNoneMatch:   o.IfNoneMatchETag})
 }
 
 // PatchItem adds a patch operation to the batch
@@ -235,6 +241,8 @@ func (b batchOperationPatch) MarshalJSON() ([]byte, error) {
 type batchOperationRead struct {
 	operationType string
 	id            string
+	ifMatch       *azcore.ETag
+	ifNoneMatch   *azcore.ETag
 }
 
 func (b batchOperationRead) getOperationType() operationType {
@@ -245,6 +253,22 @@ func (b batchOperationRead) getOperationType() operationType {
 func (b batchOperationRead) MarshalJSON() ([]byte, error) {
 	buffer := bytes.NewBufferString("{")
 	buffer.WriteString(fmt.Sprintf("\"operationType\":\"%s\"", b.operationType))
+	if b.ifNoneMatch != nil {
+		buffer.WriteString(",\"ifNoneMatch\":")
+		etag, err := json.Marshal(b.ifNoneMatch)
+		if err != nil {
+			return nil, err
+		}
+		buffer.Write(etag)
+	}
+	if b.ifMatch != nil {
+		buffer.WriteString(",\"ifMatch\":")
+		etag, err := json.Marshal(b.ifMatch)
+		if err != nil {
+			return nil, err
+		}
+		buffer.Write(etag)
+	}
 	buffer.WriteString(fmt.Sprintf(",\"id\":\"%s\"", b.id))
 	buffer.WriteString("}")
 	return buffer.Bytes(), nil
